@@ -1,10 +1,16 @@
+<img src="docs/fwr_icon.png" alt="Frosted Winter Remastered icon" width="96">
+
 # RE3 Frosted Winter Port Experimental
 
 Trabajo experimental para correr el mod de GTA III **Frosted Winter Remastered** (de Pistukas Mods) sobre el port a Android de [RE3 Android Evolved](https://github.com/codepdbh/re3-android-port-evolved) (mismo motor, mismo autor).
 
-## ⚠️ Estado: experimental, no jugable todavía
+## Estado: se juega
 
-No crashea más al iniciar partida (llegamos a in-game real: controles táctiles, HUD y posición del jugador se renderizan bien), pero **el mundo 3D se dibuja como estática/ruido** en vez de las calles y edificios del mod. Ese es el problema pendiente.
+Menú, "iniciar nueva partida", la cinemática de intro y el diálogo de la primera misión andan de punta a punta sin crashear. Antes ni siquiera pasaba del menú — el mundo se dibujaba como estática y el juego moría al segundo o dos de arrancar la partida. Todavía queda pulir cosas (ver [Pendiente](#pendiente) abajo), pero ya es jugable.
+
+| Menú principal | Nueva partida | Cinemática de intro |
+|:---:|:---:|:---:|
+| ![Menú principal](docs/fwr_screenshot_menu.png) | ![Nueva partida](docs/fwr_screenshot_newgame.png) | ![Cinemática de intro](docs/fwr_screenshot_gameplay.png) |
 
 ## Qué es esto
 
@@ -16,19 +22,37 @@ Un product flavor de Gradle nuevo (`fwr`) agregado sobre el mismo código de `re
 
 ## Bugs de compatibilidad con mods encontrados y arreglados acá
 
-Varios límites y faltas de verificación del motor original, nunca antes disparados con el juego base, que un mod "total conversion" (mapas/vehículos mucho más pesados que los originales) sí dispara:
+Varios límites y faltas de verificación del motor original, nunca antes disparados con el juego base, que un mod "total conversion" (mapas/vehículos/scripts mucho más pesados o distintos a los originales) sí dispara.
 
-- Varios límites de memoria fijos (`NUMOBJECTINFO`, `NUMPTRNODES`, `NUMBUILDINGS`, `NUMPHONES`, etc. en `config.h`) dimensionados para los mapas originales.
+**Arranque / carga:**
+- Varios límites de memoria fijos (`NUMOBJECTINFO`, `NUMPTRNODES`, `NUMBUILDINGS`, etc. en `config.h`) dimensionados para los mapas originales.
 - Modelos de vehículo con listas de materiales mal formadas (entradas nulas o punteros basura) que el motor no esperaba.
 - Un bug real en el parser de modelos `.dff` de librw (índice de material compartido sin verificar límites) — parcheado en el fork [librw-re3-android](https://github.com/codepdbh/librw-re3-android).
 - Un sprite de pantalla de carga compartido (`LoadSplash()`) cuyo TXD puede ser reciclado por el sistema de streaming sin avisar — causaba varios crashes distintos en puntos distintos del arranque.
 - Sistema de variables de debug (`CTweakVars`) deshabilitado para Android — no se usa (no hay menú de debug táctil) y crasheaba al registrarse.
+- Un `.col` (colisión) modificado más grande que el buffer fijo de 55 KB (`work_buff`) del motor original desbordaba y pisaba globals vecinas apenas arrancaba la partida — la causa de la pantalla de estática/ruido y crash inmediato al iniciar juego.
+
+**Scripts de misión (`MAIN.scm`):**
+- Varias instrucciones del script compilado del mod codifican un operando de variable local en un opcode que solo espera uno global (o al revés) — el motor lo tomaba como corrupción y abortaba; en realidad es inofensivo y ahora se tolera.
+- Cuando un comando de script pide más parámetros de los que el mod realmente codificó, el intérprete leía basura del siguiente opcode. Ahora completa con 0 y resincroniza en vez de crashear.
+- Un hilo de script del mod (`CLEOVOL`, para las teclas de volumen) usa opcodes de **CLEO**, que este motor no interpreta — no hay soporte de CLEO acá. Se neutralizó ese hilo específico.
+- Dos comandos de misión (`SET_CHAR_IS_CHRIS_CRIMINAL`, la familia `LOCATE_PLAYER_*_CAR`) asumían que el ped/vehículo referenciado siempre existía; el script modificado del mod los usa en casos donde no, y el motor moría en el assert en vez de simplemente responder que no.
+- Los iconos HUD personalizados que dibuja el script (`LOAD_SPRITE`/`DRAW_SPRITE`) no tenían límite de rango contra el array fijo de 16 slots — el mod usa más iconos de los que el motor original nunca necesitó.
+- Una textura corrupta o en un formato no soportado por una TXD modificada hacía crashear el loader en vez de simplemente descartar esa textura.
 
 Ver el historial de commits para el detalle completo de cada uno.
 
+## Pendiente
+
+- **Sin voces de diálogo.** El motor busca el audio de cada misión por nombre en una tabla fija (`MissionAudioNameSfxAssoc` en `AudioLogic.cpp`) que solo tiene los ~84 nombres originales de GTA III. Los archivos de voces custom del mod están presentes en el dispositivo, pero sus claves de nombre no están en esa tabla — hay que mapearlas.
+- **Estática breve y transitoria** al entrar a partida nueva, unos segundos antes de que cargue la cinemática — se resuelve solo, no hace falta reiniciar, pero conviene investigar la causa exacta.
+- Es de esperar que aparezcan más instancias del mismo patrón de "el script del mod no coincide exactamente con lo que el motor espera" a medida que se avanza más allá de la primera misión — cada una encontrada hasta ahora fue rápida de arreglar.
+
 ## Instalación
 
-Requiere una copia legítima de GTA III ya instalada y funcionando con `re3-android-port-evolved` (para tener `re3GTA` con `anim/`, `data/CAPS.DAT`, etc.), más los archivos del mod Frosted Winter Remastered (sin las carpetas `CLEO/`, `scripts/`, `mss/` ni los `.dll` sueltos).
+Requiere una copia legítima de GTA III ya instalada y funcionando con `re3-android-port-evolved` (para tener `re3GTA` con `anim/`, `data/CAPS.DAT`, etc.), más los archivos del mod Frosted Winter Remastered (sin las carpetas `CLEO/`, `scripts/`, `mss/` ni los `.dll` sueltos) copiados encima en `re3GTA_FWR`.
+
+También podés descargar el APK de debug ya compilado desde [Releases](../../releases) para probar directo, sin compilar nada — pero igual necesitás los archivos del juego en el dispositivo.
 
 ## Building
 
@@ -40,4 +64,4 @@ Igual que `re3-android-port-evolved`, pero usando el flavor `fwr`:
 
 ## Relación con el repo principal
 
-Este repo parte de una copia completa de [re3-android-port-evolved](https://github.com/codepdbh/re3-android-port-evolved) (mismo historial) para no depender de mantenerlos sincronizados a mano. Los arreglos de robustez del motor que no son específicos de este mod (los límites de memoria, los chequeos de punteros) también fueron subidos al repo principal por separado. El flavor `fwr` y los arreglos más frágiles/específicos de esta investigación (el manejo de `LoadSplash`, el MTE de diagnóstico, `CTweakVars`) quedan solo acá mientras siguen siendo experimentales.
+Este repo parte de una copia completa de [re3-android-port-evolved](https://github.com/codepdbh/re3-android-port-evolved) (mismo historial) para no depender de mantenerlos sincronizados a mano. Los arreglos de robustez del motor que no son específicos de este mod también fueron subidos al repo principal por separado cuando corresponde. El flavor `fwr` y los arreglos más frágiles/específicos de esta investigación quedan solo acá mientras siguen siendo experimentales.
