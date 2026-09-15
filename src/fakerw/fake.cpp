@@ -304,7 +304,17 @@ RwBool rwNativeTextureHackRead(RwStream *stream, RwTexture **tex, RwInt32 size)
 {
 	*tex = Texture::streamReadNative(stream);
 #ifdef LIBRW
-	(*tex)->raster = rw::Raster::convertTexToCurrentPlatform((*tex)->raster);
+	// A malformed/unsupported texture (e.g. a corrupt modded TXD) can come back
+	// with no raster at all - treat that as a failed read instead of crashing,
+	// same as the other failure paths in this function already do.
+	if(*tex != nil){
+		if((*tex)->raster != nil)
+			(*tex)->raster = rw::Raster::convertTexToCurrentPlatform((*tex)->raster);
+		if((*tex)->raster == nil){
+			(*tex)->destroy();
+			*tex = nil;
+		}
+	}
 #endif
 	return *tex != nil;
 }

@@ -251,7 +251,12 @@ void CRunningScript::LocatePlayerCarCommand(int32 command, uint32* pIp)
 	CollectParameters(pIp, b3D ? 6 : 5);
 	CPlayerInfo* pPlayerInfo = &CWorld::Players[ScriptParams[0]];
 	CVehicle* pTarget = CPools::GetVehiclePool()->GetAt(ScriptParams[1]);
-	script_assert(pTarget);
+	if (!pTarget) {
+		// No such vehicle (e.g. one a mod script never actually spawned) - the
+		// player plainly isn't near it, so just report that instead of crashing.
+		UpdateCompareFlag(false);
+		return;
+	}
 	CVector pos = pPlayerInfo->GetPos();
 	X = pTarget->GetPosition().x;
 	Y = pTarget->GetPosition().y;

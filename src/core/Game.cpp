@@ -1,5 +1,8 @@
 #include "common.h"
 #include "platform.h"
+#if defined ANDROID
+#include <android/log.h>
+#endif
 
 #include "Game.h"
 #include "main.h"
@@ -212,15 +215,15 @@ CGame::InitialiseRenderWare(void)
 	{
 		return (false);
 	}
-	
+
 	RwCameraSetFarClipPlane(Scene.camera, 2000.0f);	// 250.0f on PS2 but who cares
 	RwCameraSetNearClipPlane(Scene.camera, 0.9f);
-	
+
 	CameraSize(Scene.camera, nil, DEFAULT_VIEWWINDOW, DEFAULT_ASPECT_RATIO);
-	
+
 	/* Create a world */
 	RwBBox  bbox;
-	
+
 	bbox.sup.x = bbox.sup.y = bbox.sup.z = 10000.0f;
 	bbox.inf.x = bbox.inf.y = bbox.inf.z = -10000.0f;
 
@@ -232,7 +235,7 @@ CGame::InitialiseRenderWare(void)
 		Scene.camera = nil;
 		return (false);
 	}
-	
+
 	/* Add the camera to the world */
 	RpWorldAddCamera(Scene.world, Scene.camera);
 	LightsCreate(Scene.world);
@@ -662,6 +665,16 @@ bool CGame::Initialise(const char* datFile)
 	CCollision::ms_collisionInMemory = currLevel;
 	for (int i = 0; i < MAX_PADS; i++)
 		CPad::GetPad(i)->Clear(true);
+#if defined ANDROID
+	__android_log_print(ANDROID_LOG_ERROR, "RE3DIAG",
+		"CGame::Initialise done: buildings=%d objects=%d dummies=%d peds=%d vehicles=%d playerPos=(%.1f,%.1f,%.1f)",
+		CPools::GetBuildingPool()->GetNoOfUsedSpaces(),
+		CPools::GetObjectPool()->GetNoOfUsedSpaces(),
+		CPools::GetDummyPool()->GetNoOfUsedSpaces(),
+		CPools::GetPedPool()->GetNoOfUsedSpaces(),
+		CPools::GetVehiclePool()->GetNoOfUsedSpaces(),
+		FindPlayerCoors().x, FindPlayerCoors().y, FindPlayerCoors().z);
+#endif
 	return true;
 }
 
@@ -1011,6 +1024,14 @@ void CGame::InitialiseWhenRestarting(void)
 
 void CGame::Process(void) 
 {
+#if defined(ANDROID)
+	static int diagCount;
+	const bool diag = diagCount++ < 3;
+#define FWR_STEP(name) if(diag) __android_log_print(ANDROID_LOG_ERROR, "RE3DIAG", "process: %s", name)
+#else
+#define FWR_STEP(name)
+#endif
+	FWR_STEP("entry");
 	CPad::UpdatePads();
 #ifdef USE_CUSTOM_ALLOCATOR
 	ProcessTidyUpMemory();
@@ -1028,7 +1049,9 @@ void CGame::Process(void)
 		FrontEndMenuManager.Process();
 	POP_MEMID();
 
+	FWR_STEP("streaming");
 	CStreaming::Update();
+	FWR_STEP("streaming done");
 	if (!CTimer::GetIsPaused())
 	{
 		CTheZones::Update();
@@ -1042,7 +1065,9 @@ void CGame::Process(void)
 		CWeather::Update();
 
 		PUSH_MEMID(MEMID_SCRIPT);
+		FWR_STEP("scripts");
 		CTheScripts::Process();
+		FWR_STEP("scripts done");
 		POP_MEMID();
 
 		CCollision::Update();
@@ -1072,7 +1097,9 @@ void CGame::Process(void)
 		CReplay::Update();
 
 		PUSH_MEMID(MEMID_WORLD);
+		FWR_STEP("world");
 		CWorld::Process();
+		FWR_STEP("world done");
 		POP_MEMID();
 
 		gAccidentManager.Update();
@@ -1082,9 +1109,11 @@ void CGame::Process(void)
 		CRubbish::Update();
 		CSpecialFX::Update();
 		CTimeCycle::Update();
+		FWR_STEP("camera");
 		if (CReplay::ShouldStandardCameraBeProcessed())
 			TheCamera.Process();
 		CCullZones::Update();
+		FWR_STEP("camera done");
 		if (!CReplay::IsPlayingBack())
 			CGameLogic::Update();
 		CBridge::Update();
@@ -1105,6 +1134,8 @@ void CGame::Process(void)
 #ifdef GTA_PS2
 	CMemCheck::DoTest();
 #endif
+	FWR_STEP("done");
+#undef FWR_STEP
 }
 
 #ifdef USE_CUSTOM_ALLOCATOR

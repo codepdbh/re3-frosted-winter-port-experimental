@@ -1,5 +1,8 @@
 #define WITHD3D
 #include "common.h"
+#if defined(ANDROID) && defined(DEBUG)
+#include <android/log.h>
+#endif
 
 #include "main.h"
 #include "Lights.h"
@@ -115,6 +118,12 @@ CRenderer::Shutdown(void)
 void
 CRenderer::PreRender(void)
 {
+#if defined(ANDROID) && defined(DEBUG)
+	static uint32 diagFrame;
+	if((diagFrame++ % 300) == 0)
+		__android_log_print(ANDROID_LOG_DEBUG, "RE3DIAG", "renderlist: visible=%d invisible=%d requested=%d memory=%zu",
+			ms_nNoOfVisibleEntities, ms_nNoOfInVisibleEntities, CStreaming::ms_numModelsRequested, CStreaming::ms_memoryUsed);
+#endif
 	int i;
 	CLink<CVisibilityPlugins::AlphaObjectInfo> *node;
 

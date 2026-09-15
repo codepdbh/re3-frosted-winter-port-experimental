@@ -1,4 +1,7 @@
 #include "common.h"
+#ifdef ANDROID
+#include <android/log.h>
+#endif
 
 #include "Script.h"
 #include "ScriptCommands.h"
@@ -387,18 +390,28 @@ void CRunningScript::CollectParameters(uint32* pIp, int16 total)
 	for (int16 i = 0; i < total; i++){
 		float tmp;
 		uint16 varIndex;
-		switch (CTheScripts::Read1ByteFromScript(pIp))
+		uint32 ipStart = *pIp;
+		uint8 argType = CTheScripts::Read1ByteFromScript(pIp);
+		switch (argType)
 		{
 		case ARGUMENT_INT32:
 			ScriptParams[i] = CTheScripts::Read4BytesFromScript(pIp);
 			break;
 		case ARGUMENT_GLOBALVAR:
 			varIndex = CTheScripts::Read2BytesFromScript(pIp);
+#ifdef ANDROID
+			if(!(varIndex >= 8 && varIndex < CTheScripts::GetSizeOfVariableSpace()))
+				__android_log_print(ANDROID_LOG_ERROR, "RE3DIAG", "bad global param: script=%.8s ip=%u varIndex=%u spaceSize=%u", m_abScriptName, ipStart, varIndex, CTheScripts::GetSizeOfVariableSpace());
+#endif
 			script_assert(varIndex >= 8 && varIndex < CTheScripts::GetSizeOfVariableSpace());
 			ScriptParams[i] = *((int32*)&CTheScripts::ScriptSpace[varIndex]);
 			break;
 		case ARGUMENT_LOCALVAR:
 			varIndex = CTheScripts::Read2BytesFromScript(pIp);
+#ifdef ANDROID
+			if(!(varIndex < ARRAY_SIZE(m_anLocalVariables)))
+				__android_log_print(ANDROID_LOG_ERROR, "RE3DIAG", "bad local param: script=%.8s ip=%u varIndex=%u max=%u", m_abScriptName, ipStart, varIndex, (uint32)ARRAY_SIZE(m_anLocalVariables));
+#endif
 			script_assert(varIndex >= 0 && varIndex < ARRAY_SIZE(m_anLocalVariables));
 			ScriptParams[i] = m_anLocalVariables[varIndex];
 			break;
@@ -413,8 +426,18 @@ void CRunningScript::CollectParameters(uint32* pIp, int16 total)
 			ScriptParams[i] = *(int32*)&tmp;
 			break;
 		default:
-			script_assert(0);
-			break;
+#ifdef ANDROID
+			__android_log_print(ANDROID_LOG_ERROR, "RE3DIAG", "bad param type: script=%.8s ip=%u argType=%u", m_abScriptName, ipStart, argType);
+#endif
+			// Some mod-compiled instructions ask for more parameters than were actually
+			// encoded, so this reads into the next instruction's opcode bytes (often
+			// landing on ARGUMENT_END). Rewind past the byte we just misread so the
+			// next instruction still decodes correctly, default the rest to 0, and
+			// stop instead of asserting - the alternative is aborting the whole game.
+			*pIp = ipStart;
+			for(; i < total; i++)
+				ScriptParams[i] = 0;
+			return;
 		}
 	}
 }
@@ -462,13 +485,16 @@ void CRunningScript::StoreParameters(uint32* pIp, int16 number)
 
 int32 *CRunningScript::GetPointerToScriptVariable(uint32* pIp, int16 type)
 {
+	// Some mod-authored scripts (e.g. the fwr "outfits" thread) encode a local-var
+	// operand on an opcode that normally only takes globals (or vice versa). The
+	// operand itself still decodes to a valid, in-bounds variable, so honour what's
+	// actually in the bytecode instead of asserting on the caller's expected type -
+	// that mismatch is harmless and a MASTER build would already silently allow it.
 	switch (CTheScripts::Read1ByteFromScript(pIp))
 	{
 	case ARGUMENT_GLOBALVAR:
-		script_assert(type == VAR_GLOBAL);
 		return (int32*)&CTheScripts::ScriptSpace[(uint16)CTheScripts::Read2BytesFromScript(pIp)];
 	case ARGUMENT_LOCALVAR:
-		script_assert(type == VAR_LOCAL);
 		return &m_anLocalVariables[CTheScripts::Read2BytesFromScript(pIp)];
 	default:
 		script_assert(0);

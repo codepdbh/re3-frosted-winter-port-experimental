@@ -1270,7 +1270,11 @@ int8 CRunningScript::ProcessCommands900To999(int32 command)
 		int slot = CTxdStore::FindTxdSlot("script");
 		CTxdStore::PushCurrentTxd();
 		CTxdStore::SetCurrentTxd(slot);
-		CTheScripts::ScriptSprites[ScriptParams[0] - 1].SetTexture(str);
+		{
+			int32 spriteId = ScriptParams[0] - 1;
+			if (spriteId >= 0 && spriteId < ARRAY_SIZE(CTheScripts::ScriptSprites))
+				CTheScripts::ScriptSprites[spriteId].SetTexture(str);
+		}
 		CTxdStore::PopCurrentTxd();
 		return 0;
 	}

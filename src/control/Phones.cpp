@@ -343,6 +343,44 @@ CPhoneInfo::SwapPhone(float xPos, float yPos, int into)
 			nearestPhoneId = phoneId;
 		}
 	}
+	// Keep the save-compatible phone table, but allow scripts to claim a
+	// booth omitted from it when a mod has more booths than NUMPHONES.
+	CBuilding *extraBooth = nil;
+	if(m_nMax == NUMPHONES && m_nScriptPhonesMax < NUMPHONES){
+		CBuildingPool *pool = CPools::GetBuildingPool();
+		for(int i = pool->GetSize()-1; i >= 0; i--){
+			CBuilding *building = pool->GetSlot(i);
+			if(building == nil || building->GetModelIndex() != MI_PHONEBOOTH1)
+				continue;
+			float distance = (building->GetPosition() - pos).Magnitude2D();
+			if(distance >= nearestPhoneDist)
+				continue;
+			bool registered = false;
+			for(int j = 0; j < m_nMax; j++)
+				if(m_aPhones[j].m_pEntity == building){
+					registered = true;
+					break;
+				}
+			if(!registered){
+				extraBooth = building;
+				nearestPhoneDist = distance;
+			}
+		}
+	}
+	if(extraBooth){
+		nearestPhoneId = m_nScriptPhonesMax;
+		CPhone &phone = m_aPhones[nearestPhoneId];
+		phone.m_vecPos = extraBooth->GetPosition();
+		phone.m_pEntity = extraBooth;
+		phone.m_visibleToCam = false;
+		phone.m_repeatedMessagePickupStart = 0;
+		for(int i = 0; i < 6; i++)
+			phone.m_apMessages[i] = nil;
+	}
+	if(nearestPhoneId < 0){
+		debug("No available phone near %.2f, %.2f\n", xPos, yPos);
+		return -1;
+	}
 	m_aPhones[nearestPhoneId].m_nState = PHONE_STATE_MESSAGE_REMOVED;
 
 	CPhone oldPhone = m_aPhones[into];
@@ -393,7 +431,8 @@ CPhoneInfo::Initialise(void)
 		CBuilding *building = pool->GetSlot(i);
 		if (building) {
 			if (building->GetModelIndex() == MI_PHONEBOOTH1) {
-				assert(m_nMax < ARRAY_SIZE(m_aPhones) && "NUMPHONES should be increased");
+				if(m_nMax == ARRAY_SIZE(m_aPhones))
+					continue;
 				CPhone *maxPhone = &m_aPhones[m_nMax];
 				maxPhone->m_nState = PHONE_STATE_FREE;
 				maxPhone->m_vecPos = building->GetPosition();

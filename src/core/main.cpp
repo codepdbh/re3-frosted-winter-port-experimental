@@ -1,5 +1,8 @@
 #include "common.h"
 #include <time.h>
+#if defined(ANDROID) && defined(DEBUG)
+#include <android/log.h>
+#endif
 #include "rpmatfx.h"
 #include "rphanim.h"
 #include "rpskin.h"
@@ -1684,6 +1687,19 @@ Idle(void *arg)
 		return;
 
 	PUSH_MEMID(MEMID_RENDER);
+
+#if defined(ANDROID) && defined(DEBUG)
+	static uint32 diagFrame;
+	if((diagFrame++ % 300) == 0){
+		const CVector &pos = TheCamera.GetPosition();
+		__android_log_print(ANDROID_LOG_DEBUG, "RE3DIAG",
+			"frame: camera=(%.2f,%.2f,%.2f) near=%g far=%g fog=%g clock=%d:%d weather=%d/%d fade=%d menu=%d blur=%d",
+			pos.x, pos.y, pos.z, RwCameraGetNearClipPlane(Scene.camera),
+			CTimeCycle::GetFarClip(), CTimeCycle::GetFogStart(), CClock::GetHours(), CClock::GetMinutes(),
+			CWeather::OldWeatherType, CWeather::NewWeatherType, TheCamera.GetScreenFadeStatus(),
+			FrontEndMenuManager.m_bMenuActive, TheCamera.m_BlurType);
+	}
+#endif
 
 	if((!FrontEndMenuManager.m_bMenuActive || FrontEndMenuManager.m_bRenderGameInMenu) &&
 	   TheCamera.GetScreenFadeStatus() != FADE_2)

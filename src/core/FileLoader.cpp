@@ -216,24 +216,50 @@ CFileLoader::LoadCollisionFile(const char *filename)
 
 	debug("Loading collision file %s\n", filename);
 	fd = CFileMgr::OpenFile(filename, "rb");
+	if(fd == 0){
+		debug("Can't open collision file %s\n", filename);
+		POP_MEMID();
+		return;
+	}
 
-	while(CFileMgr::Read(fd, (char*)&header, sizeof(header))){
-		assert(header.ident == 'LLOC');
-		CFileMgr::Read(fd, (char*)work_buff, header.size);
-		memcpy(modelname, work_buff, 24);
+	while(CFileMgr::Read(fd, (char*)&header, sizeof(header)) == sizeof(header)){
+		// The name, bounds and five array counts occupy at least 84 bytes.
+		if(header.ident != 'LLOC' || header.size < 84 || header.size > INT32_MAX){
+			debug("Invalid collision header in %s\n", filename);
+			break;
+		}
+		// Modded COL records can exceed the shared 55 KB scratch buffer.
+		// Reading them into work_buff overwrites neighbouring engine globals.
+		uint8 *buffer = work_buff;
+		if(header.size > sizeof(work_buff))
+			buffer = (uint8*)RwMalloc(header.size);
+		if(buffer == nil){
+			debug("Can't allocate collision buffer for %s\n", filename);
+			break;
+		}
+		if(CFileMgr::Read(fd, (char*)buffer, header.size) != header.size){
+			debug("Truncated collision record in %s\n", filename);
+			if(buffer != work_buff)
+				RwFree(buffer);
+			break;
+		}
+		memcpy(modelname, buffer, sizeof(modelname));
+		modelname[sizeof(modelname)-1] = '\0';
 
 		mi = CModelInfo::GetModelInfo(modelname, nil);
 		if(mi){
 			if(mi->GetColModel()){
-				LoadCollisionModel(work_buff+24, *mi->GetColModel(), modelname);
+				LoadCollisionModel(buffer+24, *mi->GetColModel(), modelname);
 			}else{
 				CColModel *model = new CColModel;
-				LoadCollisionModel(work_buff+24, *model, modelname);
+				LoadCollisionModel(buffer+24, *model, modelname);
 				mi->SetColModel(model, true);
 			}
 		}else{
 			debug("colmodel %s can't find a modelinfo\n", modelname);
 		}
+		if(buffer != work_buff)
+			RwFree(buffer);
 	}
 
 	CFileMgr::CloseFile(fd);

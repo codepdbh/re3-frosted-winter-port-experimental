@@ -1,6 +1,9 @@
 #include <csignal>
 #define WITHWINDOWS
 #include "common.h"
+#ifdef ANDROID
+#include <android/log.h>
+#endif
 #if defined DETECT_JOYSTICK_MENU && defined XINPUT
 #include <xinput.h>
 #if !defined(PSAPI_VERSION) || (PSAPI_VERSION > 1)
@@ -1189,7 +1192,9 @@ void re3_assert(const char *expr, const char *filename, unsigned int lineno, con
 
 	abort();
 #else
-	// TODO
+	#ifdef ANDROID
+	__android_log_print(ANDROID_LOG_ERROR, "RE3", "Assertion failed: %s (%s:%u, %s)", expr, filename, lineno, func);
+	#endif
 	printf("\nRE3 ASSERT FAILED\n\tFile: %s\n\tLine: %d\n\tFunction: %s\n\tExpression: %s\n",filename,lineno,func,expr);
 	assert(false);
 #endif

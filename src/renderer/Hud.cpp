@@ -1485,7 +1485,7 @@ void CHud::DrawAfterFade()
 		if (rectangle.m_bIsUsed && !rectangle.m_bBeforeFade) {
 
 			// Yeah, top and bottom changed place. R* vision
-			if (rectangle.m_nTextureId >= 0) {
+			if (rectangle.m_nTextureId >= 0 && rectangle.m_nTextureId < ARRAY_SIZE(CTheScripts::ScriptSprites)) {
 				CTheScripts::ScriptSprites[rectangle.m_nTextureId].Draw(CRect(rectangle.m_sRect.left, rectangle.m_sRect.bottom,
 					rectangle.m_sRect.right, rectangle.m_sRect.top), rectangle.m_sColor);
 			} else {

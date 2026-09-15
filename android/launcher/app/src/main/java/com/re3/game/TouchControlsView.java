@@ -14,9 +14,12 @@ import android.os.Build;
 import android.os.Handler;
 import android.os.Looper;
 import android.view.DisplayCutout;
+import android.view.KeyEvent;
 import android.view.MotionEvent;
 import android.view.View;
 import android.view.WindowInsets;
+
+import org.libsdl.app.SDLActivity;
 
 /**
  * On-screen virtual gamepad, drawn directly over the SDL surface.
@@ -66,6 +69,10 @@ public class TouchControlsView extends View {
     private static final int BTN_DPAD_DOWN = 13;
     private static final int BTN_DPAD_LEFT = 14;
     private static final int BTN_DPAD_RIGHT = 15;
+    // Not part of TouchControls.cpp's virtual-gamepad enum (unlike the buttons
+    // above, it doesn't correspond to any SDL_GameController button) -- pressing
+    // it synthesizes a real keyboard Enter key instead, see sendEnterKey().
+    private static final int BTN_ENTER = 16;
 
     private static final int CONTEXT_MENU = 0;
     private static final int CONTEXT_ON_FOOT = 1;
@@ -148,6 +155,7 @@ public class TouchControlsView extends View {
             new Button(BTN_DPAD_DOWN, "↓"),
             new Button(BTN_DPAD_LEFT, "←"),
             new Button(BTN_DPAD_RIGHT, "→"),
+            new Button(BTN_ENTER, "ENTER"),
     };
 
     private int width, height;
@@ -393,6 +401,8 @@ public class TouchControlsView extends View {
         float h = height * 0.09f;
         placeRect(BTN_CROSS, areaRight - w - width * 0.04f, areaBottom - h - height * 0.05f, areaRight - width * 0.04f, areaBottom - height * 0.05f);
         b(BTN_CROSS).label = "SALTAR";
+
+        placeEnterButton(width * 0.18f, height * 0.07f);
     }
 
     /** Frontend menus are D-Pad + confirm/cancel + Start driven -- no mouse, no sticks. */
@@ -490,6 +500,8 @@ public class TouchControlsView extends View {
         // Start (pause), top-right corner.
         placeRect(BTN_START, areaRight - margin - baseRadius * 0.7f, areaTop + margin, areaRight - margin, areaTop + margin + baseRadius * 0.35f);
         b(BTN_START).label = "≡";
+
+        placeEnterButton(baseRadius * 0.9f, baseRadius * 0.35f);
     }
 
     private void layoutVehicle(float margin, float baseRadius) {
@@ -563,6 +575,8 @@ public class TouchControlsView extends View {
         // on foot.
         placeRect(BTN_START, areaRight - margin - baseRadius * 0.7f, areaTop + margin, areaRight - margin, areaTop + margin + baseRadius * 0.35f);
         b(BTN_START).label = "≡";
+
+        placeEnterButton(baseRadius * 0.9f, baseRadius * 0.35f);
     }
 
     private void placeCircle(int id, float cx, float cy, float radius) {
@@ -579,6 +593,18 @@ public class TouchControlsView extends View {
         btn.roundedRect = true;
         btn.hitRect.set(left, top, right, bottom);
         applyButtonCustomization(btn);
+    }
+
+    /**
+     * Top-center, clear of VISTA (top-left) and START/hamburger (top-right):
+     * script-driven "press Enter to continue" prompts can show up on foot, in
+     * a vehicle, or during a cutscene, so every context that can reach one
+     * places this the same way.
+     */
+    private void placeEnterButton(float w, float h) {
+        float midX = (areaLeft + areaRight) / 2f;
+        float margin = Math.min(width, height) * 0.06f;
+        placeRect(BTN_ENTER, midX - w / 2f, areaTop + margin, midX + w / 2f, areaTop + margin + h);
     }
 
     // --- Layout customization (edit mode) ------------------------------------
@@ -916,6 +942,12 @@ public class TouchControlsView extends View {
                     // CPad's edge detection on the right frame (see
                     // TouchControls.cpp for why that was unreliable).
                     nativeSkipCutscene();
+                } else if (btn.id == BTN_ENTER) {
+                    // One-shot, same reasoning as SALTAR above: fire the real
+                    // key press immediately on touch-down rather than trying
+                    // to hold a synthesized Enter through CPad's edge
+                    // detection for however long the finger stays down.
+                    sendEnterKey();
                 }
                 return;
             }
@@ -1019,6 +1051,21 @@ public class TouchControlsView extends View {
     private void setPressed(Button btn, boolean pressed) {
         btn.pressed = pressed;
         nativeSetButton(btn.id, pressed);
+    }
+
+    // Some script-driven prompts (e.g. the mod's own intro/credits text) wait
+    // on an actual keyboard Enter rather than a gamepad button, same as
+    // "adb shell input keyevent 66" -- which does reach the game, proving
+    // this path works. Route through SDLActivity's own native key methods so
+    // it's indistinguishable from that, instead of adding a second, separate
+    // key-injection mechanism on the native side.
+    private void sendEnterKey() {
+        try {
+            SDLActivity.onNativeKeyDown(KeyEvent.KEYCODE_ENTER);
+            SDLActivity.onNativeKeyUp(KeyEvent.KEYCODE_ENTER);
+        } catch (UnsatisfiedLinkError e) {
+            // native lib not ready yet
+        }
     }
 
     private boolean within(Stick s, float x, float y) {

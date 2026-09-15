@@ -1,4 +1,7 @@
 #include "common.h"
+#ifdef ANDROID
+#include <android/log.h>
+#endif
 
 #include "Script.h"
 #include "ScriptCommands.h"
@@ -304,6 +307,9 @@ int8 CRunningScript::ProcessCommands1000To1099(int32 command)
 #endif
 		CTimer::Suspend();
 		int offset = CTheScripts::MultiScriptArray[ScriptParams[0]];
+#ifdef ANDROID
+		__android_log_print(ANDROID_LOG_ERROR, "RE3DIAG", "launching mission %d at file offset %d", ScriptParams[0], offset);
+#endif
 #ifdef USE_DEBUG_SCRIPT_LOADER
 		int handle = CTheScripts::OpenScript();
 #else
@@ -575,8 +581,8 @@ int8 CRunningScript::ProcessCommands1000To1099(int32 command)
 	{
 		CollectParameters(&m_nIp, 2);
 		CPed* pPed = CPools::GetPedPool()->GetAt(ScriptParams[0]);
-		script_assert(pPed);
-		pPed->bChrisCriminal = !!ScriptParams[1];
+		if (pPed)
+			pPed->bChrisCriminal = !!ScriptParams[1];
 		return 0;
 	}
 	case COMMAND_START_CREDITS:
