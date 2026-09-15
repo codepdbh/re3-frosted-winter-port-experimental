@@ -909,12 +909,24 @@ void CGame::InitialiseWhenRestarting(void)
 #else
 	if ( FrontEndMenuManager.m_bWantToLoad == true )
 	{
+#ifdef ANDROID
+		__android_log_print(ANDROID_LOG_ERROR, "RE3DIAG", "InitialiseWhenRestarting: RestoreForStartLoad start");
+#endif
 		RestoreForStartLoad();
+#ifdef ANDROID
+		__android_log_print(ANDROID_LOG_ERROR, "RE3DIAG", "InitialiseWhenRestarting: RestoreForStartLoad done, LoadScene start");
+#endif
 		CStreaming::LoadScene(TheCamera.GetPosition());
+#ifdef ANDROID
+		__android_log_print(ANDROID_LOG_ERROR, "RE3DIAG", "InitialiseWhenRestarting: LoadScene done");
+#endif
 	}
 #endif
-	
+
 	ReInitGameObjectVariables();
+#ifdef ANDROID
+	__android_log_print(ANDROID_LOG_ERROR, "RE3DIAG", "InitialiseWhenRestarting: ReInitGameObjectVariables done");
+#endif
 	
 #ifdef PS2_MENU
 	if ( TheMemoryCard.m_bWantToLoad == true )
@@ -992,7 +1004,14 @@ void CGame::InitialiseWhenRestarting(void)
 #else
 	if ( FrontEndMenuManager.m_bWantToLoad == true )
 	{
-		if ( GenericLoad() == true )
+#ifdef ANDROID
+		__android_log_print(ANDROID_LOG_ERROR, "RE3DIAG", "InitialiseWhenRestarting: GenericLoad start");
+#endif
+		bool genericLoadResult = GenericLoad();
+#ifdef ANDROID
+		__android_log_print(ANDROID_LOG_ERROR, "RE3DIAG", "InitialiseWhenRestarting: GenericLoad done result=%d", genericLoadResult);
+#endif
+		if ( genericLoadResult == true )
 		{
 			DMAudio.ResetTimers(CTimer::GetTimeInMilliseconds());
 			CTrain::InitTrains();

@@ -2,6 +2,9 @@
 #include "common.h"
 #include "crossplatform.h"
 #include "main.h"
+#ifdef ANDROID
+#include <android/log.h>
+#endif
 
 #include "DMAudio.h"
 #include "AudioScriptObject.h"
@@ -78,6 +81,18 @@ do {\
 	buf = work_buff;\
 } while (0)
 
+#ifdef ANDROID
+#define ReadDataFromBlock(msg,load_func)\
+do {\
+	debug(msg);\
+	__android_log_print(ANDROID_LOG_ERROR, "RE3DIAG", "GenericLoad: start %s", msg);\
+	ReadDataFromBufferPointer(buf, size);\
+	load_func(buf, size);\
+	size = align4bytes(size);\
+	buf += size;\
+	__android_log_print(ANDROID_LOG_ERROR, "RE3DIAG", "GenericLoad: done %s", msg);\
+} while (0)
+#else
 #define ReadDataFromBlock(msg,load_func)\
 do {\
 	debug(msg);\
@@ -86,6 +101,7 @@ do {\
 	size = align4bytes(size);\
 	buf += size;\
 } while (0)
+#endif
 
 #define WriteSaveDataBlock(save_func)\
 do {\

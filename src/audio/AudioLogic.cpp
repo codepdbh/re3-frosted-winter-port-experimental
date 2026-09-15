@@ -8797,7 +8797,7 @@ void
 cAudioManager::PlayFwrCustomAudio(const char *path)
 {
 	if (m_bIsInitialised) {
-		bool8 ok = SampleManager.StartStreamedFileByPath(path, 1);
+		bool8 ok = SampleManager.StartStreamedFileByPath(path, FWR_CUSTOM_STREAM);
 #ifdef ANDROID
 		__android_log_print(ANDROID_LOG_ERROR, "RE3DIAG", "PlayFwrCustomAudio: path=%s opened=%d", path, ok);
 #endif
@@ -8809,7 +8809,7 @@ void
 cAudioManager::StopFwrCustomAudio()
 {
 	if (m_bIsInitialised) {
-		SampleManager.StopStreamedFile(1);
+		SampleManager.StopStreamedFile(FWR_CUSTOM_STREAM);
 		sFwrAudioEverStartedPlaying = FALSE;
 	}
 }
@@ -8819,7 +8819,7 @@ cAudioManager::IsFwrCustomAudioFinished()
 {
 	if (!m_bIsInitialised)
 		return TRUE;
-	bool8 playing = SampleManager.IsStreamPlaying(1);
+	bool8 playing = SampleManager.IsStreamPlaying(FWR_CUSTOM_STREAM);
 	if (playing)
 		sFwrAudioEverStartedPlaying = TRUE;
 	// Start() only kicks the stream off - actual OpenAL playback catches up

@@ -115,7 +115,13 @@ enum
 #define MAX2DCHANNELS              NUM_CHANNELS
 #endif
 
+#if defined(ANDROID) && defined(RE3_FWR)
+#define MAX_STREAMS                3
+#define FWR_CUSTOM_STREAM          2
+#else
 #define MAX_STREAMS                2
+#define FWR_CUSTOM_STREAM          1
+#endif
 
 #define DIGITALRATE                32000
 #define DIGITALBITS                16

@@ -47,6 +47,10 @@
 #include "MusicManager.h"
 #include "Frontend.h"
 #include "Timer.h"
+#if defined(ANDROID) && defined(RE3_FWR)
+#include <android/log.h>
+static bool fwrReportPlayback = false;
+#endif
 #ifdef AUDIO_OAL_USE_OPUS
 #include <opusfile.h>
 #endif
@@ -1684,6 +1688,11 @@ cSampleManager::StartStreamedFileByPath(const char *path, uint8 nStream)
 		return FALSE;
 
 	if (stream->Setup()) {
+		// Open resets the cached volume; always initialise custom dialogue.
+#if defined(ANDROID) && defined(RE3_FWR)
+		fwrReportPlayback = true;
+#endif
+		SetStreamedVolumeAndPan(MAX_VOLUME, 63, TRUE, nStream);
 		stream->Start();
 		return TRUE;
 	}
@@ -1933,8 +1942,23 @@ cSampleManager::Service(void)
 	{
 		CStream *stream = aStream[i];
 		
-		if ( stream->IsOpened() )
+		if ( stream->IsOpened() ) {
+#if defined(ANDROID) && defined(RE3_FWR)
+			if (i == FWR_CUSTOM_STREAM) {
+				// Fades and settings change after a cutscene starts. Reapply
+				// them each frame instead of keeping a stale (possibly zero) gain.
+				SetStreamedVolumeAndPan(MAX_VOLUME, 63, TRUE, i);
+				stream->SetPause(CTimer::GetIsUserPaused());
+				if (fwrReportPlayback && stream->IsPlaying() && stream->m_nVolume > 0) {
+					ALfloat gain = 0.0f;
+					alGetSourcef(ALStreamSources[i][0], AL_GAIN, &gain);
+					__android_log_print(ANDROID_LOG_INFO, "RE3DIAG", "FWR voice playing: stream=%d volume=%u gain=%f positionMs=%u", i, stream->m_nVolume, gain, stream->GetPosMS());
+					fwrReportPlayback = false;
+				}
+			}
+#endif
 			stream->Update();
+		}
 	}
 	int refCount = CChannel::channelsThatNeedService;
 	for ( int32 i = 0; refCount && i < NUM_CHANNELS; i++ )
