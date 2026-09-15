@@ -521,6 +521,11 @@ public:
 	void ClearMissionAudio();
 	void ProcessMissionAudio();
 
+	// FWR custom mod dialogue audio (see DMAudio.h)
+	void PlayFwrCustomAudio(const char *path);
+	void StopFwrCustomAudio();
+	bool8 IsFwrCustomAudioFinished();
+
 	// police radio
 	void InitialisePoliceRadioZones();
 	void InitialisePoliceRadio();

@@ -110,7 +110,12 @@ void _psCreateFolder(const char *path)
 const char *_psGetUserFilesFolder()
 {
     static char szUserFiles[256];
+#if defined(ANDROID) && defined(RE3_FWR)
+    // Keep mod saves separate from base-game saves bundled with copied data.
+    strcpy(szUserFiles, "fwr_userfiles");
+#else
     strcpy(szUserFiles, "userfiles");
+#endif
     _psCreateFolder(szUserFiles);
     return szUserFiles;
 }

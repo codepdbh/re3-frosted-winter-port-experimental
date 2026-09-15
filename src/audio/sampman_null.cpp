@@ -328,9 +328,17 @@ cSampleManager::StartPreloadedStreamedFile(uint8 nStream)
 
 bool8
 cSampleManager::StartStreamedFile(uint8 nFile, uint32 nPos, uint8 nStream)
-{	
+{
 	ASSERT( nStream < MAX_STREAMS );
-	
+
+	return FALSE;
+}
+
+bool8
+cSampleManager::StartStreamedFileByPath(const char *path, uint8 nStream)
+{
+	ASSERT( nStream < MAX_STREAMS );
+
 	return FALSE;
 }
 

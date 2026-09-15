@@ -680,7 +680,12 @@ CCollision::TestSphereTriangle(const CColSphere &sphere,
 		dist = Abs(planedist);
 		break;
 	default:
-		assert(0);
+		// Geometrically impossible for a well-formed triangle (the three
+		// half-plane tests above should always agree on 1-3 of them), but a
+		// degenerate triangle from a modded collision mesh (zero-area, or
+		// two coincident vertices) can produce a contradictory testcase 0.
+		// Treat it as "not touching" rather than asserting.
+		return false;
 	}
 
 	return dist < sphere.radius;

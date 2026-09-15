@@ -1,4 +1,7 @@
 #include "common.h"
+#ifdef ANDROID
+#include <android/log.h>
+#endif
 
 #include "AudioManager.h"
 #include "audio_enums.h"
@@ -8761,6 +8764,9 @@ cAudioManager::PreloadMissionAudio(Const char *name)
 {
 	if (m_bIsInitialised) {
 		uint32 missionAudioSfx = FindMissionAudioSfx(name);
+#ifdef ANDROID
+		__android_log_print(ANDROID_LOG_ERROR, "RE3DIAG", "PreloadMissionAudio: name=%s found=%d", name, missionAudioSfx != NO_SAMPLE);
+#endif
 		if (missionAudioSfx != NO_SAMPLE) {
 			m_nMissionAudioSampleIndex = missionAudioSfx;
 			m_nMissionAudioLoadingStatus = LOADING_STATUS_NOT_LOADED;
@@ -8778,6 +8784,59 @@ cAudioManager::PreloadMissionAudio(Const char *name)
 			g_bMissionAudioLoadFailed = FALSE;
 		}
 	}
+}
+
+// FWR custom mod dialogue: reserved stream slot 1 (radio/cutscene playback
+// defaults to slot 0 throughout this file), opened directly by path instead
+// of going through the fixed vanilla mission-audio name table - the mod's
+// own dialogue lines were never going to fit in that ~84-entry table built
+// for the original 84 GTA III missions.
+static bool8 sFwrAudioEverStartedPlaying = FALSE;
+
+void
+cAudioManager::PlayFwrCustomAudio(const char *path)
+{
+	if (m_bIsInitialised) {
+		bool8 ok = SampleManager.StartStreamedFileByPath(path, 1);
+#ifdef ANDROID
+		__android_log_print(ANDROID_LOG_ERROR, "RE3DIAG", "PlayFwrCustomAudio: path=%s opened=%d", path, ok);
+#endif
+		sFwrAudioEverStartedPlaying = FALSE;
+	}
+}
+
+void
+cAudioManager::StopFwrCustomAudio()
+{
+	if (m_bIsInitialised) {
+		SampleManager.StopStreamedFile(1);
+		sFwrAudioEverStartedPlaying = FALSE;
+	}
+}
+
+bool8
+cAudioManager::IsFwrCustomAudioFinished()
+{
+	if (!m_bIsInitialised)
+		return TRUE;
+	bool8 playing = SampleManager.IsStreamPlaying(1);
+	if (playing)
+		sFwrAudioEverStartedPlaying = TRUE;
+	// Start() only kicks the stream off - actual OpenAL playback catches up
+	// a frame or more later on the audio thread. Without this, the very
+	// first poll (still "not playing" because it hasn't started yet) would
+	// misread as "already finished" and the wait loop calling this would
+	// never actually wait, racing straight through the line (and whatever
+	// cutscene pacing was gated on it) before a word of it played.
+	bool8 finished = sFwrAudioEverStartedPlaying ? !playing : FALSE;
+#ifdef ANDROID
+	static bool8 lastFinished = -1;
+	if (finished != lastFinished) {
+		lastFinished = finished;
+		__android_log_print(ANDROID_LOG_ERROR, "RE3DIAG", "IsFwrCustomAudioFinished: everStarted=%d playing=%d -> finished=%d", sFwrAudioEverStartedPlaying, playing, finished);
+	}
+#endif
+	return finished;
 }
 
 uint8

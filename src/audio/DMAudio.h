@@ -85,6 +85,14 @@ public:
 	bool8 IsMissionAudioSampleFinished(void);
 	void ClearMissionAudio(void);
 
+	// FWR custom: mod-added dialogue audio, played by path (see the opcode
+	// 0x0AAC/0x05EE handling in Script.cpp) instead of through the fixed
+	// ~84-entry vanilla mission audio name table, which the mod's own new
+	// lines were never going to fit into.
+	void PlayFwrCustomAudio(const char *path);
+	void StopFwrCustomAudio(void);
+	bool8 IsFwrCustomAudioFinished(void);
+
 	uint8 GetRadioInCar(void);
 	void SetRadioInCar(uint32 radio);
 	void SetRadioChannel(uint8 radio, int32 pos);

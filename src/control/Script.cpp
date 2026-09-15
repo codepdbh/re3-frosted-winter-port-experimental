@@ -786,9 +786,43 @@ int8 CRunningScript::ProcessOneCommand()
 {
 	int8 retval = -1;
 	++CTheScripts::CommandsExecuted;
+	uint32 ipBeforeOpcode = m_nIp;
 	int32 command = (uint16)CTheScripts::Read2BytesFromScript(&m_nIp);
 	m_bNotFlag = (command & 0x8000);
 	command &= 0x7FFF;
+#ifdef ANDROID
+	// Any opcode still unhandled past the dispatch chain below (i.e. not one
+	// of the two FWR ones specifically handled there) is unknown to this
+	// interpreter entirely - most likely another CLEO opcode the mod's
+	// script uses that we haven't met yet. Log each distinct one once so a
+	// future investigation has the exact ip/bytes to work from, the same
+	// way 0x0AAC/0x05EE were originally found.
+	if(command >= 1156 && command != 2732 && command != 1518 && command != 2733 &&
+	   command != 31402 && command != 31403 && command != 31404 && command != 31419 && command != 31420){
+		static uint32 seenIps[30];
+		static int numSeen = 0;
+		bool alreadySeen = false;
+		for(int i = 0; i < numSeen; i++)
+			if(seenIps[i] == ipBeforeOpcode){ alreadySeen = true; break; }
+		if(!alreadySeen && numSeen < 30){
+			seenIps[numSeen++] = ipBeforeOpcode;
+			char hex[181];
+			for(int i = 0; i < 60; i++)
+				sprintf(hex + i*3, "%02x ", CTheScripts::ScriptSpace[ipBeforeOpcode + i]);
+			__android_log_print(ANDROID_LOG_ERROR, "RE3DIAG", "unrecognized opcode: script=%.8s ip=%u command=%d(0x%x) bytes=%s", m_abScriptName, ipBeforeOpcode, command, command, hex);
+		}
+	}
+	// Full execution trace across the D03->D15 dialogue transition window,
+	// to see the ACTUAL runtime path (vs static bytecode reading, which is
+	// error-prone by hand) - which opcode diverts flow past D04..D14.
+	if(ipBeforeOpcode >= 131900 && ipBeforeOpcode <= 135000){
+		static int numTraced = 0;
+		if(numTraced < 3000){
+			numTraced++;
+			__android_log_print(ANDROID_LOG_ERROR, "RE3DIAG", "TRACE script=%.8s ip=%u command=%d(0x%x) notflag=%d", m_abScriptName, ipBeforeOpcode, command, command, m_bNotFlag != 0);
+		}
+	}
+#endif
 #ifdef USE_ADVANCED_SCRIPT_DEBUG_OUTPUT
 	LogBeforeProcessingCommand(command);
 #endif
@@ -820,6 +854,133 @@ int8 CRunningScript::ProcessOneCommand()
 		retval = ProcessCommands1000To1099(command);
 	else if (command < 1200)
 		retval = ProcessCommands1100To1199(command);
+#endif
+#ifdef ANDROID
+	// FWR mod opcodes from IIIAudioLibrary.cleo (fwr/CLEO/CLEO_PLUGINS) - a
+	// small third-party CLEO plugin (source not included, but the compiled
+	// x86 .cleo was small enough to disassemble by hand) wrapping the BASS
+	// audio library so PC CLEO scripts can play arbitrary files outside
+	// vanilla GTA III's fixed ~84-entry mission-audio table. None of these
+	// opcode numbers exist in vanilla GTA III, so they can't live in the
+	// ProcessCommandsXToY tables above without colliding with real ones.
+	// The plugin drives 3 independent BASS stream handles; re3's own audio
+	// backend only has 2 general-purpose stream slots total (MAX_STREAMS in
+	// sampman.h, #0 already used elsewhere e.g. radio) and no BASS, so all
+	// three are folded onto the one slot DMAudio.PlayFwrCustomAudio() uses -
+	// starting a new one always stops whatever was already playing there,
+	// same as the plugin's own handlers do internally per-handle anyway.
+	// Getting every opcode's parameter count exactly right matters even for
+	// the ones left unimplemented below: this interpreter has no way to
+	// skip over an unrecognized instruction's operands, so leaving any of
+	// these ungated would desync the whole rest of the script into reading
+	// raw parameter/string bytes as further opcodes.
+	else if (command == 2732) {
+		// 0x0AAC: play on stream 1 (dialogue). Args: CLEO string (1-byte
+		// length prefix + raw bytes - not the type-tagged kind
+		// CollectParameters understands), then an int (loop flag) and a
+		// float (volume, passed to BASS_ChannelSetAttribute/BASS_ATTRIB_VOL
+		// in the original) - collected generically since CollectParameters
+		// doesn't care what a value means, only how it's encoded.
+		uint8 strType = CTheScripts::Read1ByteFromScript(&m_nIp);
+		if (strType == 0x0E) {
+			uint8 len = CTheScripts::Read1ByteFromScript(&m_nIp);
+			char path[128];
+			if (len >= sizeof(path))
+				len = sizeof(path) - 1;
+			memcpy(path, &CTheScripts::ScriptSpace[m_nIp], len);
+			path[len] = '\0';
+			m_nIp += len;
+			CollectParameters(&m_nIp, 2);
+			DMAudio.PlayFwrCustomAudio(path);
+		}
+		retval = 0;
+	}
+	else if (command == 1518) {
+		// CLEO 0x05EE: IS_KEY_PRESSED, with one virtual-key argument.
+		// In FWR, 04 10 is the encoded VK_SHIFT argument, not opcode 0x1004.
+		// Dialogue completion must not trigger the cinematic skip condition.
+		CollectParameters(&m_nIp, 1);
+		CPad *pad = CPad::GetPad(0);
+		bool pressed = false;
+		switch (ScriptParams[0]) {
+		case 0x09: pressed = pad->GetTab(); break;
+		case 0x10: pressed = pad->GetShift() || pad->GetLeftShift() || pad->GetRightShift(); break;
+		case 0x11: pressed = pad->GetLeftCtrl() || pad->GetRightCtrl(); break;
+		case 0x12: pressed = pad->GetLeftAlt() || pad->GetRightAlt(); break;
+		case 0x0D: pressed = pad->GetEnter() || pad->GetPadEnter(); break;
+		case 0x1B: pressed = pad->GetEscape(); break;
+		case 0x20: pressed = pad->GetChar(' '); break;
+		default:
+			if (ScriptParams[0] >= '0' && ScriptParams[0] <= 'Z')
+				pressed = pad->GetChar(ScriptParams[0]);
+			break;
+		}
+		UpdateCompareFlag(pressed);
+		retval = 0;
+	}
+	else if (command == 2733) {
+		// 0x0AAD: stop+free stream 1 if it's playing, no arguments. Mostly
+		// redundant in practice - 0x0AAC above already stops/replaces
+		// whatever was on stream 1 before playing something new - but call
+		// it for real in case something relies on stream 1 going silent
+		// without a next line queued up right behind it.
+		DMAudio.StopFwrCustomAudio();
+		retval = 0;
+	}
+	else if (command == 31402) {
+		// 0x7AAA: play on stream 3 (background/ambient - stops any
+		// currently-playing stream 1 dialogue first in the original, since
+		// they were never meant to overlap). Args: CLEO string only.
+		uint8 strType = CTheScripts::Read1ByteFromScript(&m_nIp);
+		if (strType == 0x0E) {
+			uint8 len = CTheScripts::Read1ByteFromScript(&m_nIp);
+			char path[128];
+			if (len >= sizeof(path))
+				len = sizeof(path) - 1;
+			memcpy(path, &CTheScripts::ScriptSpace[m_nIp], len);
+			path[len] = '\0';
+			m_nIp += len;
+			DMAudio.PlayFwrCustomAudio(path);
+		}
+		retval = 0;
+	}
+	else if (command == 31403) {
+		// 0x7AAB: stop+free stream 3, no arguments.
+		DMAudio.StopFwrCustomAudio();
+		retval = 0;
+	}
+	else if (command == 31404) {
+		// 0x7AAC: play on stream 2 - a second, independent dialogue-style
+		// channel (e.g. two characters talking over each other). Same 3
+		// args as 0x0AAC (string, int, float).
+		uint8 strType = CTheScripts::Read1ByteFromScript(&m_nIp);
+		if (strType == 0x0E) {
+			uint8 len = CTheScripts::Read1ByteFromScript(&m_nIp);
+			char path[128];
+			if (len >= sizeof(path))
+				len = sizeof(path) - 1;
+			memcpy(path, &CTheScripts::ScriptSpace[m_nIp], len);
+			path[len] = '\0';
+			m_nIp += len;
+			CollectParameters(&m_nIp, 2);
+			DMAudio.PlayFwrCustomAudio(path);
+		}
+		retval = 0;
+	}
+	else if (command == 31419) {
+		// 0x7ABB: seek stream 3 to a position built from 2 script args
+		// (BASS_ChannelSetPosition with a byte offset in the original).
+		// Not implemented - consuming the 2 args correctly is what actually
+		// matters here (keeps the rest of the script in sync).
+		CollectParameters(&m_nIp, 2);
+		retval = 0;
+	}
+	else if (command == 31420) {
+		// 0x7ABC: pause stream 3 if playing, resume if paused - 1 script
+		// arg. Not implemented, same reasoning as 0x7ABB above.
+		CollectParameters(&m_nIp, 1);
+		retval = 0;
+	}
 #endif
 #ifdef USE_ADVANCED_SCRIPT_DEBUG_OUTPUT
 	LogAfterProcessingCommand(command);
@@ -2440,6 +2601,15 @@ int8 CRunningScript::ProcessCommands200To299(int32 command)
 	*/
 	case COMMAND_ANDOR:
 		CollectParameters(&m_nIp, 1);
+#ifdef ANDROID
+		if(m_nIp >= 131900 && m_nIp <= 135000){
+			static int numAndorLogged = 0;
+			if(numAndorLogged < 40){
+				numAndorLogged++;
+				__android_log_print(ANDROID_LOG_ERROR, "RE3DIAG", "ANDOR: ip=%u type=%d", m_nIp, ScriptParams[0]);
+			}
+		}
+#endif
 		m_nAndOrState = ScriptParams[0];
 		if (m_nAndOrState == ANDOR_NONE){
 			m_bCondResult = false; // pointless
@@ -2622,6 +2792,15 @@ int8 CRunningScript::ProcessCommands200To299(int32 command)
 	{
 		CollectParameters(&m_nIp, 2);
 		bool value = GetPadState(ScriptParams[0], ScriptParams[1]) != 0;
+#ifdef ANDROID
+		if (ScriptParams[1] == 15) {
+			static bool8 lastVal = -1;
+			if (value != lastVal) {
+				lastVal = value;
+				__android_log_print(ANDROID_LOG_ERROR, "RE3DIAG", "IS_BUTTON_PRESSED(pad=%d,button=15/Triangle): %d", ScriptParams[0], value);
+			}
+		}
+#endif
 #ifdef GTA_PC_CONTROLS
 		if (CGame::playingIntro && ScriptParams[0] == 0 && ScriptParams[1] == 12) {
 			if (CPad::GetPad(0)->GetLeftMouseJustDown() ||

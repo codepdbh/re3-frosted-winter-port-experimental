@@ -11,8 +11,8 @@ android {
         applicationId "com.re3.game"
         minSdk 24
         targetSdk 35
-        versionCode 8
-        versionName "1.0.7"
+        versionCode 9
+        versionName "1.0.8"
 
         ndkVersion '27.2.12479018'
 
@@ -37,6 +37,11 @@ android {
         fwr {
             dimension "variant"
             applicationIdSuffix ".fwr"
+            externalNativeBuild {
+                cmake {
+                    cppFlags '-DRE3_FWR'
+                }
+            }
             versionNameSuffix "-fwr"
             buildConfigField "String", "GAME_FOLDER_NAME", "\"re3GTA_FWR\""
         }

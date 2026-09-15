@@ -44,9 +44,16 @@ Ver el historial de commits para el detalle completo de cada uno.
 
 ## Pendiente
 
-- **Sin voces de diálogo.** El motor busca el audio de cada misión por nombre en una tabla fija (`MissionAudioNameSfxAssoc` en `AudioLogic.cpp`) que solo tiene los ~84 nombres originales de GTA III. Los archivos de voces custom del mod están presentes en el dispositivo, pero sus claves de nombre no están en esa tabla — hay que mapearlas.
+- **Voces personalizadas:** la introducción carga M00D03 a M00D22 en orden. Se adaptaron las llamadas de audio del mod y la consulta CLEO de teclas; queda comprobar el resto de las misiones.
 - **Estática breve y transitoria** al entrar a partida nueva, unos segundos antes de que cargue la cinemática — se resuelve solo, no hace falta reiniciar, pero conviene investigar la causa exacta.
 - Es de esperar que aparezcan más instancias del mismo patrón de "el script del mod no coincide exactamente con lo que el motor espera" a medida que se avanza más allá de la primera misión — cada una encontrada hasta ahora fue rápida de arreglar.
+
+## Actualización 1.0.8-fwr
+
+- Corregido el salto automático de diálogos: `05EE` consulta una tecla y consume su argumento; terminar una voz ya no equivale a pedir que se salte la escena.
+- Guardados propios en `/storage/emulated/0/re3GTA_FWR/fwr_userfiles/`. FWR ya no lee las partidas de `userfiles` que puedan haberse copiado con los datos del juego base. Los archivos anteriores se conservan y no se migran automáticamente porque pueden pertenecer a GTA III.
+- Compilación Android verificada para `arm64-v8a` y `armeabi-v7a`; APK instalado en Samsung y menú de carga comprobado con ocho ranuras libres.
+- La prueba de voces recorrió M00D03 a M00D22 y devolvió el control al jugador en Puerto de Portland. No se ha probado toda la campaña.
 
 ## Instalación
 

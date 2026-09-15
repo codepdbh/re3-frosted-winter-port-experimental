@@ -293,6 +293,24 @@ cDMAudio::PreloadMissionAudio(Const char *missionAudio)
 	AudioManager.PreloadMissionAudio(missionAudio);
 }
 
+void
+cDMAudio::PlayFwrCustomAudio(const char *path)
+{
+	AudioManager.PlayFwrCustomAudio(path);
+}
+
+void
+cDMAudio::StopFwrCustomAudio(void)
+{
+	AudioManager.StopFwrCustomAudio();
+}
+
+bool8
+cDMAudio::IsFwrCustomAudioFinished(void)
+{
+	return AudioManager.IsFwrCustomAudioFinished();
+}
+
 uint8
 cDMAudio::GetMissionAudioLoadingStatus(void)
 {

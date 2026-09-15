@@ -227,6 +227,9 @@ public:
 	void  StartPreloadedStreamedFile                                           (uint8 nStream = 0);
 	bool8 StartStreamedFile                          (uint8 nFile, uint32 nPos, uint8 nStream = 0);
 	void  StopStreamedFile                                                     (uint8 nStream = 0);
+	// Opens+starts an arbitrary file by path instead of a StreamedNameTable
+	// index - for mod-added audio that was never baked into that fixed table.
+	bool8 StartStreamedFileByPath                            (const char *path, uint8 nStream = 0);
 	int32 GetStreamedFilePosition                                              (uint8 nStream = 0);
 	void  SetStreamedVolumeAndPan(uint8 nVolume, uint8 nPan, bool8 nEffectFlag, uint8 nStream = 0);
 	int32 GetStreamedFileLength                                                (uint8 nStream = 0);

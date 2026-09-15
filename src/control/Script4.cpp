@@ -1,4 +1,7 @@
 #include "common.h"
+#ifdef ANDROID
+#include <android/log.h>
+#endif
 
 #include "Script.h"
 #include "ScriptCommands.h"
@@ -949,7 +952,11 @@ int8 CRunningScript::ProcessCommands800To899(int32 command)
 	{
 		CollectParameters(&m_nIp, 3);
 		CPed* pPed = CPools::GetPedPool()->GetAt(ScriptParams[0]);
-		script_assert(pPed);
+#ifdef ANDROID
+		__android_log_print(ANDROID_LOG_ERROR, "RE3DIAG", "SET_CHAR_WAIT_STATE: pedIdx=%d pPed=%p state=%d arg=%d", ScriptParams[0], pPed, ScriptParams[1], ScriptParams[2]);
+#endif
+		if (!pPed)
+			return 0;
 		pPed->SetWaitState((eWaitState)ScriptParams[1], ScriptParams[2] >= 0 ? &ScriptParams[2] : nil);
 		return 0;
 	}

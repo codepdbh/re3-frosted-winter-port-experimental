@@ -2184,12 +2184,19 @@ cSampleManager::StartPreloadedStreamedFile(uint8 nStream)
 }
 
 bool8
+cSampleManager::StartStreamedFileByPath(const char *path, uint8 nStream)
+{
+	// FWR-mod-specific (see DMAudio.h) - not wired up for the Miles backend.
+	return FALSE;
+}
+
+bool8
 cSampleManager::StartStreamedFile(uint8 nFile, uint32 nPos, uint8 nStream)
 {
 	uint32 i = 0;
 	uint32 position = nPos;
 	char filename[MAX_PATH];
-	
+
 	if ( !m_bInitialised || nFile >= TOTAL_STREAMED_SOUNDS )
 		return FALSE;
 

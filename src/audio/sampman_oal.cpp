@@ -1669,6 +1669,29 @@ cSampleManager::StartPreloadedStreamedFile(uint8 nStream)
 }
 
 bool8
+cSampleManager::StartStreamedFileByPath(const char *path, uint8 nStream)
+{
+	ASSERT( nStream < MAX_STREAMS );
+
+	CStream *stream = aStream[nStream];
+	stream->Close();
+
+	// casepath() (called inside CStream::Open on non-Windows) already
+	// resolves backslashes and wrong case against the real files on disk,
+	// same as every other streamed audio path in this table - no
+	// translation needed here.
+	if (!stream->Open(path))
+		return FALSE;
+
+	if (stream->Setup()) {
+		stream->Start();
+		return TRUE;
+	}
+	stream->Close();
+	return FALSE;
+}
+
+bool8
 cSampleManager::StartStreamedFile(uint8 nFile, uint32 nPos, uint8 nStream)
 {
 	uint32 i = 0;

@@ -1059,13 +1059,33 @@ public class TouchControlsView extends View {
     // this path works. Route through SDLActivity's own native key methods so
     // it's indistinguishable from that, instead of adding a second, separate
     // key-injection mechanism on the native side.
+    //
+    // Down and up are deliberately NOT back-to-back: re3's default PC
+    // keybinds map Enter to VEHICLE_ENTER_EXIT, which the game reads through
+    // the same NewState.Triangle field a real gamepad Triangle press would
+    // set. A real "adb shell input keyevent 66" goes through Android's
+    // normal input pipeline with real timing between down and up; calling
+    // onNativeKeyDown/Up back-to-back here instead let SDL coalesce them
+    // into what the game's own frame poll saw as Triangle simply staying
+    // held -- which happened to be exactly the button the fwr mod's own
+    // "press a button to advance" dialogue-wait loop polls for, so one tap
+    // of this button silently kept "holding Triangle" for the rest of the
+    // session and skipped every line after the first. Spacing the up event
+    // out onto its own posted frame is enough for the game to see a real,
+    // momentary press instead.
     private void sendEnterKey() {
         try {
             SDLActivity.onNativeKeyDown(KeyEvent.KEYCODE_ENTER);
-            SDLActivity.onNativeKeyUp(KeyEvent.KEYCODE_ENTER);
         } catch (UnsatisfiedLinkError e) {
-            // native lib not ready yet
+            return; // native lib not ready yet
         }
+        contextPoller.postDelayed(() -> {
+            try {
+                SDLActivity.onNativeKeyUp(KeyEvent.KEYCODE_ENTER);
+            } catch (UnsatisfiedLinkError e) {
+                // native lib unloaded mid-flight -- nothing to clean up
+            }
+        }, 80);
     }
 
     private boolean within(Stick s, float x, float y) {
